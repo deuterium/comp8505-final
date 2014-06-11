@@ -26,6 +26,44 @@ require 'packetfu'
 
 ## Variables
 
+
 ## Functions
+def load_config_file
+
+end
+
+def start_server(port)
+
+end
+
+def encrypt(message)
+
+  payload = nil
+  return payload
+end
+
+def decrypt(payload)
+
+  message = nil
+  return message
+end
+
+def parse_payload(payload)
+
+end
+
+def execute_shell_command(command)
+
+end
+
+def start_watch(type, name)
+  #type is file or folder
+  
+end
+
+def send_file(file, destination)
+  
+end
+
 
 ## Main
