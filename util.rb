@@ -1,4 +1,7 @@
-$KEY = OpenSSL::Digest::SHA256.new("verysecretkey").digest
+$KEY = OpenSSL::Digest::SHA256.new("wowsuchsecretkey").digest
+TCP = "tcp"
+UDP = "udp"
+AUTH_STRING = "echidna"
 
 def exit_reason(reason)
     puts reason
@@ -23,9 +26,9 @@ end
 def valid_protocol(protocol)
   protocol.downcase!
   case protocol
-  when "tcp"
+  when TCP
     return true
-  when "udp"
+  when UDP
     return true
   else
     return false
