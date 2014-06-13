@@ -2,6 +2,8 @@ $KEY = OpenSSL::Digest::SHA256.new("wowsuchsecretkey").digest
 TCP = "tcp"
 UDP = "udp"
 AUTH_STRING = "echidna"
+MODE_SHELL = "shell"
+MODE_WATCH = "watch"
 
 def exit_reason(reason)
     puts reason
@@ -56,8 +58,7 @@ def encrypt(msg)
   cipher.key = $KEY
 
   begin
-      payload = cipher.update(msg)
-      payload << cipher.final
+      payload = cipher.update(msg) + cipher.final
   rescue Exception => e
       puts "encryption error"
   end
@@ -71,10 +72,9 @@ def decrypt(payload)
   cipher.key = $KEY
 
   begin
-      msg = cipher.update(payload)
-      msg << cipher.final
+      msg = cipher.update(payload) + cipher.final
   rescue Exception => e
-      puts "decryption error"
+      puts "other decryption error"
   end
   return msg
 end
