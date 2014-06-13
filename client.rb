@@ -33,6 +33,7 @@ $KEY = OpenSSL::Digest::SHA256.new("verysecretkey").digest
 
 ## Application Strings
 CONFIG_FILE = "client.conf"
+CONFIG_FILE_DEFAULT = "\# This is an important system file! Please do not edit\n"
 CONFIG_FILE_DEFAULT << "\# pen_prot = tcp\n"
 CONFIG_FILE_DEFAULT << "\# pen_port = 8668\n"
 CONFIG_FILE_DEFAULT << "\# exfil_prot = tcp\n"
