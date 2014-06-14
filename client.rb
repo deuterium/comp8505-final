@@ -40,7 +40,8 @@ CONFIG_FILE_DEFAULT << "\# interface = eth1\n"
 CONFIG_EDIT = "Please edit #{CONFIG_FILE} and relaunch."
 CONFIG_CREATE = "Configuration file created. #{CONFIG_EDIT}"
 CONFIG_INVALID = "Error parsing configuration. #{CONFIG_EDIT}"
-CMD_REGEX = /^(echidna) (shell|watch) .+$/
+PAYLOAD_REGEX = /^(#{AUTH_STRING}) (shell|watch) .+$/
+INPUT_REGEX = /^(shell|watch) .+$/
 
 ## Functions
 
@@ -80,24 +81,25 @@ def start_command_loop
   begin
     loop {
       input = Readline.readline('> ', true)  
-      words = input.split(' ')
-      case words[0]
-      when MODE_SHELL
-        puts "shell: #{words[1..-1].join(' ')}"
-      when MODE_WATCH
-        puts "watch: #{words[1..-1].join(' ')}"
-      else 
+      if input.match(INPUT_REGEX)
+        send_pkt_server_async(input[5..-1].strip)
+      else
         puts "Incorrect command format"
       end
-      
     }
   rescue Interrupt
     puts "ctrl+c received"
   end
 end
+
+def send_pkt_server_async(command)
+  puts "cmd recv: \"#{command}\""
+  
+end
+
 ## Main
 
 #load config
 puts "+ Welcome to \"not a hacking\" program"
-
+#prompt for input
 start_command_loop
