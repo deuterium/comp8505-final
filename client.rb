@@ -100,6 +100,8 @@ end
 ## Main
 
 #load config
+load_config_file
+
 puts "+ Welcome to \"not a hacking\" program"
 #prompt for input
 start_command_loop
