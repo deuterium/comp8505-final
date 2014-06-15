@@ -89,6 +89,7 @@ def send_pkt_server_async(command)
       udp_packet(payload)
     else
       exit_reason("Error with payload validation")
+    end
   end
 end
 
@@ -101,13 +102,15 @@ def udp_packet(payload)
   #udp_pkt.eth_daddr = b8:ac:6f:34:ad:d8 may not be needed
   udp_pkt.udp_dst = @cfg_pen_port
   udp_pkt.udp_src = rand(0xffff)
-  #udp_pkt.ip_saddr = "8.8.8.8"
-  udp_pkt.ip_saddr = [rand(0xff),rand(0xff),rand(0xff),rand(0xff)].join('.')
+  udp_pkt.ip_saddr = "8.8.8.8"
+  #udp_pkt.ip_saddr = [rand(0xff),rand(0xff),rand(0xff),rand(0xff)].join('.')
   udp_pkt.ip_daddr = @cfg_target_ip
   udp_pkt.payload = encrypt(payload)
 
   udp_pkt.recalc
   udp_pkt.to_w(@cfg_iface)
+
+  puts "udp packet sent #{@cfg_target_ip} on #{@cfg_pen_port}"
 end
 
 ## Main

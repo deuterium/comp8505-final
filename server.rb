@@ -47,7 +47,7 @@ CONFIG_INVALID = "Error parsing configuration. #{CONFIG_EDIT}"
 ## Functions
 
 def start_listen_server
-  puts "server listening"
+  puts "server listening on #{@cfg_pen_protocol}:#{@cfg_pen_port}"
   filter = "#{@cfg_pen_protocol} and dst port #{@cfg_pen_port}"
   begin
     cap = PacketFu::Capture.new(:iface => @cfg_iface,
