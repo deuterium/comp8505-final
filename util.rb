@@ -73,6 +73,9 @@ def validate_config
       when "interface"
         #interface validation?
         @cfg_iface = pair[1]
+      when "target_ip"
+        #IP validation in client
+        @cfg_target_ip = pair[1]
       end
     end
   end

