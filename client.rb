@@ -63,8 +63,8 @@ end
 
 def start_command_loop
   puts "+ enter a command (2 options)"
-  puts "+ shell |command|"
-  puts "+ watch |dir or file to watch|"
+  puts "+ shell (cmd)"
+  puts "+ watch (dir|file) (path)"
   puts "+ \"ctrl + c\" to exit"
   begin
     loop {

