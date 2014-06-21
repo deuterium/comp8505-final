@@ -172,7 +172,7 @@ end
 ## Main
 
 load_config_file
-validate_target_ip
+validate_target_ip($cfg_target_ip)
 puts "+ Welcome to \"not a hacking\" program"
 begin
   listening_thread = Thread.new { listen_for_knock }

