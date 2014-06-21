@@ -79,6 +79,8 @@ def validate_config
       when "exfil_addr"
         #IP validation in server
         @cfg_exfil_ip = pair[1]
+      when "ttl"
+        @cfg_exfil_ttl = pair[1]
       end
     end
   end
