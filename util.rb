@@ -150,7 +150,7 @@ end
 # - IP Addr to validate
 # @return [Boolean]
 # true if valid, false if not
-def validate_target_ip(ip)
+def validate_ip(ip)
   if !IPAddress.valid_ipv4?(ip)
     exit_reason("Invalid target ip address")
   end
