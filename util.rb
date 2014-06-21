@@ -76,6 +76,9 @@ def validate_config
       when "target_ip"
         #IP validation in client
         @cfg_target_ip = pair[1]
+      when "exfil_addr"
+        #IP validation in server
+        @cfg_exfil_ip = pair[1]
       end
     end
   end
@@ -99,6 +102,12 @@ def valid_port(num)
     else
       return false
     end
+end
+
+def validate_target_ip
+  if !IPAddress.valid_ipv4?(@cfg_target_ip)
+    exit_reason("Invalid target ip address")
+  end
 end
 
 def encrypt(msg)

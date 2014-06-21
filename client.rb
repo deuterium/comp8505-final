@@ -55,12 +55,6 @@ def start_receiving_server
   
 end
 
-def validate_target_ip
-  if !IPAddress.valid_ipv4?(@cfg_target_ip)
-    exit_reason("Invalid target ip address")
-  end
-end
-
 def start_command_loop
   puts "+ enter a command (2 options)"
   puts "+ shell (cmd)"

