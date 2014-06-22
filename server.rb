@@ -125,9 +125,9 @@ def start_watch(type, name)
     glob = '**/*'
     path = name
   else
-    #parse file from path
-    #glob = 
-    #path = 
+    items = name.split('/')
+    glob = items[items.length-1] 
+    path = "/#{items[0..items.length-2].join('/')}"
   end
 
   monitor = FSSM::Monitor.new
